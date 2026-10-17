@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即時雙向語音翻譯器</title>
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #F1F5F9;
+            --card-bg: #FFFFFF;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --accent-red: #EF4444;
+            --accent-blue: #0EA5E9;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            padding: 8px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 8px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .lang-select {
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: white;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .split-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            justify-content: space-between;
+        }
+
+        .card-top {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .content-box {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .card-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--border-color);
+            padding-top: 8px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--primary-color);
+            padding: 4px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .icon-btn:hover {
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+
+        .mic-btn-sm {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+            transition: transform 0.2s, background-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .mic-btn-sm.secondary {
+            background-color: var(--accent-blue);
+            box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.2);
+        }
+
+        .mic-btn-sm:active {
+            transform: scale(0.95);
+        }
+
+        .mic-btn-sm.recording {
+            background-color: var(--accent-red) !important;
+            animation: pulse 1.5s infinite;
+        }
+
+        .mic-btn-sm svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .status-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 頂部標題與語系選單 -->
+        <header>
+            <h1>雙向語音翻譯器</h1>
+            <select id="targetLang" class="lang-select">
+                <option value="en">英文 (English)</option>
+                <option value="ja">日文 (日本語)</option>
+                <option value="ko">韓文 (한국어)</option>
+            </select>
+        </header>
+
+        <!-- 上下雙區對話容器 -->
+        <div class="split-container">
+            
+            <!-- 區塊一：我方發話 (中文 -> 外文) -->
+            <div class="card">
+                <div class="card-top">
+                    <div class="card-header">
+                        <div class="card-title">我方說中文 ➔ 翻譯外文</div>
+                    </div>
+                    <div id="myOriginal" class="content-box" style="color: var(--text-muted);">點擊下方按鈕開始說中文...</div>
+                    <div id="myTranslated" class="content-box" style="font-weight: 600; color: var(--primary-color);">等待輸入...</div>
+                </div>
+                <div class="card-bottom">
+                    <span id="myStatus" class="status-text">就緒</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="speakMyBtn" class="icon-btn" title="播放翻譯語音" style="display: none;">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </button>
+                        <button id="micMyBtn" class="mic-btn-sm" title="我方開始講話">
+                            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 區塊二：對方發話 (外文 -> 中文) -->
+            <div class="card">
+                <div class="card-top">
+                    <div class="card-header">
+                        <div class="card-title">對方說外文 ➔ 翻譯中文</div>
+                    </div>
+                    <div id="otherOriginal" class="content-box" style="color: var(--text-muted);">對方點擊下方按鈕開始說外文...</div>
+                    <div id="otherTranslated" class="content-box" style="font-weight: 600; color: var(--accent-blue);">等待輸入...</div>
+                </div>
+                <div class="card-bottom">
+                    <span id="otherStatus" class="status-text">就緒</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button id="speakOtherBtn" class="icon-btn" title="播放中文語音" style="display: none;">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </button>
+                        <button id="micOtherBtn" class="mic-btn-sm secondary" title="對方開始講話">
+                            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const targetLangSelect = document.getElementById('targetLang');
+        
+        const micMyBtn = document.getElementById('micMyBtn');
+        const myStatus = document.getElementById('myStatus');
+        const myOriginal = document.getElementById('myOriginal');
+        const myTranslated = document.getElementById('myTranslated');
+        const speakMyBtn = document.getElementById('speakMyBtn');
+
+        const micOtherBtn = document.getElementById('micOtherBtn');
+        const otherStatus = document.getElementById('otherStatus');
+        const otherOriginal = document.getElementById('otherOriginal');
+        const otherTranslated = document.getElementById('otherTranslated');
+        const speakOtherBtn = document.getElementById('speakOtherBtn');
+
+        let activeRecognition = null;
+
+        function setupRecognition(isMySide) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('您的瀏覽器不支援語音辨識功能。');
+                return null;
+            }
+
+            const recognition = new SpeechRecognition();
+            const currentLang = targetLangSelect.value;
+            
+            recognition.lang = isMySide ? 'zh-TW' : getSpeechLangCode(currentLang);
+            recognition.interimResults = true;
+            recognition.continuous = false;
+
+            recognition.onstart = () => {
+                if (isMySide) {
+                    micMyBtn.classList.add('recording');
+                    myStatus.textContent = '聆聽中...';
+                    myOriginal.textContent = '聆聽中...';
+                    myOriginal.style.color = 'var(--text-main)';
+                } else {
+                    micOtherBtn.classList.add('recording');
+                    otherStatus.textContent = 'Listening...';
+                    otherOriginal.textContent = 'Listening...';
+                    otherOriginal.style.color = 'var(--text-main)';
+                }
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                
+                if (isMySide) {
+                    myOriginal.textContent = transcript;
+                    translateAndHandle(transcript, 'zh-TW', currentLang, true);
+                } else {
+                    otherOriginal.textContent = transcript;
+                    translateAndHandle(transcript, currentLang, 'zh-TW', false);
+                }
+            };
+
+            recognition.onerror = () => {
+                resetState(isMySide);
+            };
+
+            recognition.onend = () => {
+                resetState(isMySide);
+            };
+
+            return recognition;
+        }
+
+        function getSpeechLangCode(lang) {
+            switch(lang) {
+                case 'ja': return 'ja-JP';
+                case 'ko': return 'ko-KR';
+                default: return 'en-US';
+            }
+        }
+
+        function resetState(isMySide) {
+            if (isMySide) {
+                micMyBtn.classList.remove('recording');
+                myStatus.textContent = '就緒';
+            } else {
+                micOtherBtn.classList.remove('recording');
+                otherStatus.textContent = '就緒';
+            }
+        }
+
+        micMyBtn.addEventListener('click', () => {
+            if (activeRecognition) {
+                activeRecognition.stop();
+                activeRecognition = null;
+                return;
+            }
+            myTranslated.textContent = '翻譯中...';
+            speakMyBtn.style.display = 'none';
+            activeRecognition = setupRecognition(true);
+            if (activeRecognition) activeRecognition.start();
+        });
+
+        micOtherBtn.addEventListener('click', () => {
+            if (activeRecognition) {
+                activeRecognition.stop();
+                activeRecognition = null;
+                return;
+            }
+            otherTranslated.textContent = '翻譯中...';
+            speakOtherBtn.style.display = 'none';
+            activeRecognition = setupRecognition(false);
+            if (activeRecognition) activeRecognition.start();
+        });
+
+        async function translateAndHandle(text, sourceLang, destLang, isMySide) {
+            if (!text.trim()) return;
+            try {
+                const langPair = `${sourceLang}|${destLang}`;
+                const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data && data.responseData) {
+                    const translated = data.responseData.translatedText;
+                    if (isMySide) {
+                        myTranslated.textContent = translated;
+                        speakMyBtn.style.display = 'flex';
+                        playSpeech(translated, destLang);
+                    } else {
+                        otherTranslated.textContent = translated;
+                        speakOtherBtn.style.display = 'flex';
+                        playSpeech(translated, destLang);
+                    }
+                }
+            } catch (error) {
+                const errText = '翻譯連線失敗';
+                if (isMySide) myTranslated.textContent = errText;
+                else otherTranslated.textContent = errText;
+            }
+        }
+
+        function playSpeech(text, lang) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = getSpeechLangCode(lang) || (lang === 'zh-TW' ? 'zh-TW' : 'en-US');
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        speakMyBtn.addEventListener('click', () => {
+            playSpeech(myTranslated.textContent, targetLangSelect.value);
+        });
+
+        speakOtherBtn.addEventListener('click', () => {
+            playSpeech(otherTranslated.textContent, 'zh-TW');
+        });
+    </script>
+</body>
+</html>
