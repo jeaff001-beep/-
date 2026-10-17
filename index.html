@@ -259,7 +259,7 @@
 
     <script>
         const targetLangSelect = document.getElementById('targetLang');
-        
+
         const micMyBtn = document.getElementById('micMyBtn');
         const myStatus = document.getElementById('myStatus');
         const myOriginal = document.getElementById('myOriginal');
@@ -273,6 +273,23 @@
         const speakOtherBtn = document.getElementById('speakOtherBtn');
 
         let activeRecognition = null;
+        const translationRequest = { my: 0, other: 0 };
+
+        function getSpeechLangCode(lang) {
+            switch (lang) {
+                case 'zh-TW': return 'zh-TW';
+                case 'ja': return 'ja-JP';
+                case 'ko': return 'ko-KR';
+                default: return 'en-US';
+            }
+        }
+
+        function resetState(isMySide) {
+            const button = isMySide ? micMyBtn : micOtherBtn;
+            const status = isMySide ? myStatus : otherStatus;
+            button.classList.remove('recording');
+            status.textContent = '就緒';
+        }
 
         function setupRecognition(isMySide) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -283,134 +300,153 @@
 
             const recognition = new SpeechRecognition();
             const currentLang = targetLangSelect.value;
-            
+            let translatedFinal = false;
             recognition.lang = isMySide ? 'zh-TW' : getSpeechLangCode(currentLang);
             recognition.interimResults = true;
             recognition.continuous = false;
 
             recognition.onstart = () => {
-                if (isMySide) {
-                    micMyBtn.classList.add('recording');
-                    myStatus.textContent = '聆聽中...';
-                    myOriginal.textContent = '聆聽中...';
-                    myOriginal.style.color = 'var(--text-main)';
-                } else {
-                    micOtherBtn.classList.add('recording');
-                    otherStatus.textContent = 'Listening...';
-                    otherOriginal.textContent = 'Listening...';
-                    otherOriginal.style.color = 'var(--text-main)';
-                }
+                const button = isMySide ? micMyBtn : micOtherBtn;
+                const status = isMySide ? myStatus : otherStatus;
+                const original = isMySide ? myOriginal : otherOriginal;
+                button.classList.add('recording');
+                status.textContent = isMySide ? '聆聽中...' : 'Listening...';
+                original.textContent = status.textContent;
+                original.style.color = 'var(--text-main)';
             };
 
             recognition.onresult = (event) => {
                 let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
+                let allFinal = true;
+                for (let i = 0; i < event.results.length; i++) {
                     transcript += event.results[i][0].transcript;
+                    if (!event.results[i].isFinal) allFinal = false;
                 }
-                
-                if (isMySide) {
-                    myOriginal.textContent = transcript;
-                    translateAndHandle(transcript, 'zh-TW', currentLang, true);
-                } else {
-                    otherOriginal.textContent = transcript;
-                    translateAndHandle(transcript, currentLang, 'zh-TW', false);
+                transcript = transcript.trim();
+                const original = isMySide ? myOriginal : otherOriginal;
+                original.textContent = transcript;
+
+                if (allFinal && transcript && !translatedFinal) {
+                    translatedFinal = true;
+                    translateAndHandle(
+                        transcript,
+                        isMySide ? 'zh-TW' : currentLang,
+                        isMySide ? currentLang : 'zh-TW',
+                        isMySide
+                    );
                 }
             };
 
             recognition.onerror = () => {
-                resetState(isMySide);
+                if (activeRecognition === recognition) {
+                    activeRecognition = null;
+                    resetState(isMySide);
+                }
             };
-
             recognition.onend = () => {
-                resetState(isMySide);
+                if (activeRecognition === recognition) {
+                    activeRecognition = null;
+                    resetState(isMySide);
+                }
             };
-
             return recognition;
         }
 
-        function getSpeechLangCode(lang) {
-            switch(lang) {
-                case 'ja': return 'ja-JP';
-                case 'ko': return 'ko-KR';
-                default: return 'en-US';
+        function startRecognition(isMySide) {
+            if (activeRecognition) {
+                const previous = activeRecognition;
+                activeRecognition = null;
+                previous.stop();
+                resetState(true);
+                resetState(false);
+                return;
             }
-        }
 
-        function resetState(isMySide) {
-            if (isMySide) {
-                micMyBtn.classList.remove('recording');
-                myStatus.textContent = '就緒';
+            const side = isMySide ? 'my' : 'other';
+            translationRequest[side]++;
+            const translated = isMySide ? myTranslated : otherTranslated;
+            const speakButton = isMySide ? speakMyBtn : speakOtherBtn;
+            translated.textContent = '等待語音輸入...';
+            speakButton.style.display = 'none';
+            const recognition = setupRecognition(isMySide);
+            if (recognition) {
+                activeRecognition = recognition;
+                recognition.start();
             } else {
-                micOtherBtn.classList.remove('recording');
-                otherStatus.textContent = '就緒';
+                translated.textContent = '無法使用語音辨識';
             }
         }
 
-        micMyBtn.addEventListener('click', () => {
+        micMyBtn.addEventListener('click', () => startRecognition(true));
+        micOtherBtn.addEventListener('click', () => startRecognition(false));
+        targetLangSelect.addEventListener('change', () => {
+            translationRequest.my++;
+            translationRequest.other++;
             if (activeRecognition) {
-                activeRecognition.stop();
+                const previous = activeRecognition;
                 activeRecognition = null;
-                return;
+                previous.stop();
+                resetState(true);
+                resetState(false);
             }
-            myTranslated.textContent = '翻譯中...';
+            myTranslated.textContent = '等待輸入...';
+            otherTranslated.textContent = '等待輸入...';
             speakMyBtn.style.display = 'none';
-            activeRecognition = setupRecognition(true);
-            if (activeRecognition) activeRecognition.start();
-        });
-
-        micOtherBtn.addEventListener('click', () => {
-            if (activeRecognition) {
-                activeRecognition.stop();
-                activeRecognition = null;
-                return;
-            }
-            otherTranslated.textContent = '翻譯中...';
             speakOtherBtn.style.display = 'none';
-            activeRecognition = setupRecognition(false);
-            if (activeRecognition) activeRecognition.start();
         });
 
         async function translateAndHandle(text, sourceLang, destLang, isMySide) {
             if (!text.trim()) return;
+            const side = isMySide ? 'my' : 'other';
+            const requestId = ++translationRequest[side];
+            const translatedBox = isMySide ? myTranslated : otherTranslated;
+            const speakButton = isMySide ? speakMyBtn : speakOtherBtn;
+            translatedBox.textContent = '翻譯中...';
             try {
-                const langPair = `${sourceLang}|${destLang}`;
-                const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
-                const response = await fetch(url);
+                const query = new URLSearchParams({ q: text, langpair: `${sourceLang}|${destLang}` });
+                const response = await fetch(`https://api.mymemory.translated.net/get?${query}`);
                 const data = await response.json();
-                
-                if (data && data.responseData) {
-                    const translated = data.responseData.translatedText;
-                    if (isMySide) {
-                        myTranslated.textContent = translated;
-                        speakMyBtn.style.display = 'flex';
-                        playSpeech(translated, destLang);
-                    } else {
-                        otherTranslated.textContent = translated;
-                        speakOtherBtn.style.display = 'flex';
-                        playSpeech(translated, destLang);
-                    }
+                if (requestId !== translationRequest[side]) return;
+
+                if (!response.ok || Number(data.responseStatus) !== 200 || data.quotaFinished) {
+                    const quotaExceeded = response.status === 429 || Number(data.responseStatus) === 429 || data.quotaFinished;
+                    translatedBox.textContent = quotaExceeded
+                        ? '翻譯服務額度已用完，請稍後再試'
+                        : '翻譯服務暫時無法使用';
+                    return;
                 }
+
+                const translated = data.responseData?.translatedText;
+                if (typeof translated !== 'string' || !translated.trim()) {
+                    translatedBox.textContent = '翻譯服務未回傳結果';
+                    return;
+                }
+                translatedBox.textContent = translated.trim();
+                speakButton.style.display = 'flex';
+                playSpeech(translated, destLang);
             } catch (error) {
-                const errText = '翻譯連線失敗';
-                if (isMySide) myTranslated.textContent = errText;
-                else otherTranslated.textContent = errText;
+                if (requestId === translationRequest[side]) {
+                    translatedBox.textContent = '翻譯連線失敗，請稍後再試';
+                }
             }
         }
 
         function playSpeech(text, lang) {
-            if ('speechSynthesis' in window) {
+            if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
+            try {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = getSpeechLangCode(lang) || (lang === 'zh-TW' ? 'zh-TW' : 'en-US');
+                utterance.lang = getSpeechLangCode(lang);
                 utterance.rate = 1.0;
                 window.speechSynthesis.speak(utterance);
+            } catch (error) {
+                console.warn('語音播放失敗', error);
             }
         }
 
         speakMyBtn.addEventListener('click', () => {
             playSpeech(myTranslated.textContent, targetLangSelect.value);
         });
-
         speakOtherBtn.addEventListener('click', () => {
             playSpeech(otherTranslated.textContent, 'zh-TW');
         });
