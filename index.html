@@ -200,8 +200,8 @@
         <!-- 頂部標題與語系選單 -->
         <header>
             <h1>雙向語音翻譯器</h1>
-            <select id="targetLang" class="lang-select">
-                <option value="en">英文 (English)</option>
+            <select id="targetLang" class="lang-select" aria-label="對方語言">
+                <option value="en" selected>英文 (English)</option>
                 <option value="ja">日文 (日本語)</option>
                 <option value="ko">韓文 (한국어)</option>
             </select>
@@ -214,7 +214,7 @@
             <div class="card">
                 <div class="card-top">
                     <div class="card-header">
-                        <div class="card-title">我方說中文 ➔ 翻譯外文</div>
+                        <div id="myDirection" class="card-title">我方說中文 ➔ 英文</div>
                     </div>
                     <div id="myOriginal" class="content-box" style="color: var(--text-muted);">點擊下方按鈕開始說中文...</div>
                     <div id="myTranslated" class="content-box" style="font-weight: 600; color: var(--primary-color);">等待輸入...</div>
@@ -225,7 +225,7 @@
                         <button id="speakMyBtn" class="icon-btn" title="播放翻譯語音" style="display: none;">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                         </button>
-                        <button id="micMyBtn" class="mic-btn-sm" title="我方開始講話">
+                        <button id="micMyBtn" class="mic-btn-sm" title="我方開始講中文" aria-label="我方開始講中文">
                             <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
                         </button>
                     </div>
@@ -236,7 +236,7 @@
             <div class="card">
                 <div class="card-top">
                     <div class="card-header">
-                        <div class="card-title">對方說外文 ➔ 翻譯中文</div>
+                        <div id="otherDirection" class="card-title">對方說英文 ➔ 中文</div>
                     </div>
                     <div id="otherOriginal" class="content-box" style="color: var(--text-muted);">對方點擊下方按鈕開始說外文...</div>
                     <div id="otherTranslated" class="content-box" style="font-weight: 600; color: var(--accent-blue);">等待輸入...</div>
@@ -247,7 +247,7 @@
                         <button id="speakOtherBtn" class="icon-btn" title="播放中文語音" style="display: none;">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                         </button>
-                        <button id="micOtherBtn" class="mic-btn-sm secondary" title="對方開始講話">
+                        <button id="micOtherBtn" class="mic-btn-sm secondary" title="對方開始講英文" aria-label="對方開始講英文">
                             <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
                         </button>
                     </div>
@@ -259,6 +259,9 @@
 
     <script>
         const targetLangSelect = document.getElementById('targetLang');
+        const myDirection = document.getElementById('myDirection');
+        const otherDirection = document.getElementById('otherDirection');
+        const languageNames = { en: '英文', ja: '日文', ko: '韓文' };
 
         const micMyBtn = document.getElementById('micMyBtn');
         const myStatus = document.getElementById('myStatus');
@@ -273,7 +276,17 @@
         const speakOtherBtn = document.getElementById('speakOtherBtn');
 
         let activeRecognition = null;
+        let activeSide = null;
         const translationRequest = { my: 0, other: 0 };
+
+        function updateDirectionLabels() {
+            const language = languageNames[targetLangSelect.value];
+            myDirection.textContent = `我方說中文 ➔ ${language}`;
+            otherDirection.textContent = `對方說${language} ➔ 中文`;
+            micOtherBtn.title = `對方開始講${language}`;
+            micOtherBtn.setAttribute('aria-label', micOtherBtn.title);
+        }
+        updateDirectionLabels();
 
         function getSpeechLangCode(lang) {
             switch (lang) {
@@ -306,6 +319,7 @@
             recognition.continuous = false;
 
             recognition.onstart = () => {
+                if (activeRecognition !== recognition) return;
                 const button = isMySide ? micMyBtn : micOtherBtn;
                 const status = isMySide ? myStatus : otherStatus;
                 const original = isMySide ? myOriginal : otherOriginal;
@@ -316,6 +330,7 @@
             };
 
             recognition.onresult = (event) => {
+                if (activeRecognition !== recognition) return;
                 let transcript = '';
                 let allFinal = true;
                 for (let i = 0; i < event.results.length; i++) {
@@ -340,12 +355,14 @@
             recognition.onerror = () => {
                 if (activeRecognition === recognition) {
                     activeRecognition = null;
+                    activeSide = null;
                     resetState(isMySide);
                 }
             };
             recognition.onend = () => {
                 if (activeRecognition === recognition) {
                     activeRecognition = null;
+                    activeSide = null;
                     resetState(isMySide);
                 }
             };
@@ -355,11 +372,13 @@
         function startRecognition(isMySide) {
             if (activeRecognition) {
                 const previous = activeRecognition;
+                const sameSide = activeSide === isMySide;
                 activeRecognition = null;
+                activeSide = null;
                 previous.stop();
                 resetState(true);
                 resetState(false);
-                return;
+                if (sameSide) return;
             }
 
             const side = isMySide ? 'my' : 'other';
@@ -371,6 +390,7 @@
             const recognition = setupRecognition(isMySide);
             if (recognition) {
                 activeRecognition = recognition;
+                activeSide = isMySide;
                 recognition.start();
             } else {
                 translated.textContent = '無法使用語音辨識';
@@ -380,11 +400,13 @@
         micMyBtn.addEventListener('click', () => startRecognition(true));
         micOtherBtn.addEventListener('click', () => startRecognition(false));
         targetLangSelect.addEventListener('change', () => {
+            updateDirectionLabels();
             translationRequest.my++;
             translationRequest.other++;
             if (activeRecognition) {
                 const previous = activeRecognition;
                 activeRecognition = null;
+                activeSide = null;
                 previous.stop();
                 resetState(true);
                 resetState(false);
